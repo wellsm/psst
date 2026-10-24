@@ -1,0 +1,58 @@
+# Desktop installers on every version tag: git tag v0.2.0 && git push origin v0.2.0
+# Each OS builds on its own runner (macOS can't be built on Linux). The home screen links to
+# releases/latest/download/Psst-<os>.<ext>, so file names must stay stable (artifactName in packages/desktop).
+# Needs the repository variable VITE_SERVER_URL (e.g. wss://your-server), baked into the client at build time.
+name: Desktop release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            args: --mac --universal
+          - os: windows-latest
+            args: --win
+          - os: ubuntu-latest
+            args: --linux
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # --publish never: electron-builder would otherwise try to publish by itself on tag builds in CI.
+      - run: npm run dist:desktop -- ${{ matrix.args }} --publish never "-c.extraMetadata.version=${GITHUB_REF_NAME#v}"
+        env:
+          VITE_SERVER_URL: ${{ vars.VITE_SERVER_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            packages/desktop/release/Psst-*
+            !packages/desktop/release/*.blockmap
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

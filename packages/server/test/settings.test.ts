@@ -18,7 +18,7 @@ import {
   type TrapKind,
 } from '@psst/shared';
 import { Match } from '../src/sim/Match';
-import { DT, LANE_Y, audioOnly, effects, hold, input, p, place, run, setup, sounds, trapAt, usePower } from './helpers';
+import { DT, LANE_Y, audioOnly, effects, hold, input, p, place, run, setup, sounds, tileOf, trapAt, usePower } from './helpers';
 
 type Patch = Partial<MatchSettings>;
 type Scenario = { value: number; base?: number; run: (patch: Patch) => unknown };
@@ -175,7 +175,8 @@ const SCENARIOS: Record<SettingKey, Scenario> = {
   runIntensity: { value: 0.5, run: (pt) => { const m = setup({ settings: pt }); place(m, 'h1', 3, LANE_Y); return sounds(hold(m, 'h1', { mx: 1, run: true }, 1, 'h1'), 'run')[0]?.i; } },
   noisyZoneMultiplier: { value: 1.5, run: (pt) => {
     const m = setup({ settings: pt });
-    place(m, 'h1', 9.5, 2.5); // arena puddle at x 9..12, y 2..3
+    const puddle = tileOf(m, '~');
+    place(m, 'h1', puddle.x + 0.5, puddle.y + 0.5);
     return sounds(hold(m, 'h1', { mx: 0.3 }, 1, 'h1'), 'water')[0]?.i;
   } },
   voiceInterval: { value: 0.3, run: (pt) => { const m = setup({ settings: pt }); m.setSpeaking('h1', true); return sounds(run(m, 2, 'h1'), 'voice').length; } },

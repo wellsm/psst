@@ -98,6 +98,14 @@ export const audioOnly = (evs: GameEvent[], type?: string) =>
 /** Open 24 m wide lane in the arena (row y=16.5 is free from x=1 to x=36). */
 export const LANE_Y = 16.5;
 
+/** First tile `c` of the match map in row-major order (top-left corner of the first such object). */
+export function tileOf(m: Match, c: string): { x: number; y: number } {
+  const { tiles, width } = m.layout.map;
+  const i = tiles.indexOf(c);
+  if (i < 0) throw new Error(`no '${c}' tile`);
+  return { x: i % width, y: Math.floor(i / width) };
+}
+
 /** Drops an armed trap of kind `k` at (x, y). */
 export function trapAt(m: Match, k: TrapKind, x: number, y: number): TrapSim {
   const t: TrapSim = { id: 1000 + m.traps.length, k, x, y, armed: true, rearmIn: 0, ringsLeft: 0, ringIn: 0, extra: false };

@@ -74,7 +74,13 @@ VITE_SERVER_URL=wss://your-server npm run dist:desktop # installers in packages/
 ```
 The app only contains the client; it connects to the hosted game server given by `VITE_SERVER_URL`.
 Targets: macOS dmg/zip, Windows nsis/zip (`npm run dist:win -w @psst/desktop`), Linux AppImage
-(`npm run dist:linux -w @psst/desktop`, runs on Steam Deck). Builds are unsigned (macOS: right-click → Open).
+(`npm run dist:linux -w @psst/desktop`, runs on Steam Deck). Builds are not notarized: macOS is ad-hoc signed
+(right-click → Open), Windows is unsigned (SmartScreen warning).
+
+Releases: pushing a `v*` tag (`git tag v0.2.0 && git push origin v0.2.0`) runs `.github/workflows/desktop-release.yml`,
+which builds each OS on its own runner and publishes a GitHub Release (needs the repository variable `VITE_SERVER_URL`).
+The home screen links to `releases/latest/download/Psst-{mac.dmg,win.exe,linux.AppImage}` (button for the visitor's OS),
+so keep the `artifactName` patterns in `packages/desktop/package.json`.
 Steam Deck / Steam Input without publishing: add the app as a "Non-Steam game" in the Steam library.
 
 ## Docs

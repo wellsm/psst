@@ -145,15 +145,15 @@ export class World {
       this.buffer = [];
       this.predictor.reset();
     }
-    if (wasLobby !== l.phase || !this.layout) this.ensureLayout(l.mapId, 0);
+    if (wasLobby !== l.phase || !this.layout) this.ensureLayout(l.mapId, 0, 0);
     for (const x of this.listeners) x.onLobby?.(l);
   }
 
-  private ensureLayout(mapId: string, seed: number) {
-    const key = `${mapId}:${seed}:${this.settings.bottleRefillStations}`;
+  private ensureLayout(mapId: string, seed: number, side: number) {
+    const key = `${mapId}:${seed}:${this.settings.bottleRefillStations}:${side}`;
     if (key === this.layoutKey) return;
     this.layoutKey = key;
-    this.layout = buildLayout(mapId, seed, this.settings.bottleRefillStations);
+    this.layout = buildLayout(mapId, seed, this.settings.bottleRefillStations, side);
   }
 
   moveContext(): MoveContext | null {
@@ -171,7 +171,7 @@ export class World {
 
   setSnap(snap: Snapshot, now: number) {
     if (snap.phase === 'lobby') return;
-    this.ensureLayout(snap.mapId, snap.seed);
+    this.ensureLayout(snap.mapId, snap.seed, snap.mapSide);
     const sample = snap.t - now;
     if (!this.hasOffset || Math.abs(sample - this.offset) > 1) {
       this.offset = sample;

@@ -31,6 +31,9 @@
     ],
     "mac": {
       "category": "public.app-category.games",
+      "artifactName": "Psst-mac.${ext}",
+      "identity": "-",
+      "hardenedRuntime": false,
       "target": [
         "dmg",
         "zip"
@@ -40,6 +43,7 @@
       }
     },
     "win": {
+      "artifactName": "Psst-win.${ext}",
       "target": [
         "nsis",
         "zip"
@@ -49,7 +53,8 @@
       "target": [
         "AppImage"
       ],
-      "category": "Game"
+      "category": "Game",
+      "artifactName": "Psst-linux.${ext}"
     }
   },
   "devDependencies": {

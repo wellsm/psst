@@ -25,14 +25,14 @@ const KITCHEN: MapDef = {
     '#..............XX............XX............C.#',
     '#.~~~.....OO...XX.==.........XX.........~~~~.#',
     '#.~~~..?..OO...XX..........?.XX..OO.....~~~~.#',
-    '#..............XX....XXX.....XX..OO.....~~~~.#',
-    '#..............XX....XXX.....XX..............#',
+    '#..............XX............XX..OO.....~~~~.#',
+    '#..............XX............XX..............#',
     '#.....S......................XX..............#',
     '#............................XX.......XX.....#',
     '#....................::::.............XX.....#',
     '#....................::::.............XX.....#',
     '#.LL......OO...XX.L..::::..L..........XX..?..#',
-    '#.LL......OO...XX.................L..........#',
+    '#.LL......OO...XX............................#',
     '#..............XX..?.........XX..............#',
     '#............C.XX..........C.XX.....?........#',
     '#..............XX............XX..............#',
@@ -40,8 +40,8 @@ const KITCHEN: MapDef = {
     '#XXXX....XXXXXXXXXXX......XXXXXXXXXX....XXXXX#',
     '#..............XX...........CXX..............#',
     '#...........?..XX.L........L.XX..........?...#',
-    '#...XX.........XX......?.....XX..OO..........#',
-    '#...XX..............::::::.......OO..........#',
+    '#...XX.........XX......?.....XX..............#',
+    '#...XX..............::::::...................#',
     '#...XX..............::::::...................#',
     '#C........OO........::**::............XXXX..C#',
     '#.........OO........::**::............XXXX...#',
@@ -54,16 +54,16 @@ const KITCHEN: MapDef = {
     '#XXXXXX....XXXXXXXXX......XXXXXXXX....XXXXXXX#',
     '#..............XX........?...XX......~~~.....#',
     '#..............XX............XX..............#',
-    '#..OO..........XX..XXX.......XX..OO.......L..#',
-    '#..OO.....L....XX..XXX....L......OO..........#',
+    '#..OO..........XX............XX..OO.......L..#',
+    '#..OO.....L....XX.........L......OO..........#',
     '#..............XX......................?.....#',
-    '#......?...............?.....................#',
+    '#......?.....................................#',
     '#............................................#',
     '#....................::::....XX.......P......#',
     '#....XX..~~~~........::::....XX..............#',
     '#....XX..~~~~..XX....::::....XX..............#',
-    '#....XX..~~~~..XX.OO......OO.XX..........OO..#',
-    '#.?............XX.OO......OO.XX..L.......OO..#',
+    '#....XX..~~~~..XX.OO.........XX..........OO..#',
+    '#.?............XX.OO.........XX..L.......OO..#',
     '#..............XXC.....===...XX..............#',
     '#C.............XX............XX.............C#',
     '##############################################',
@@ -237,14 +237,70 @@ export interface MapData {
   ghostBounds: { x0: number; y0: number; x1: number; y1: number };
 }
 
+/** Map side (m) by player count at match start; smaller maps are stretched up to it, never shrunk. */
+export const MAP_SIDES: readonly { maxPlayers: number; side: number }[] = [
+  { maxPlayers: 6, side: 46 },
+  { maxPlayers: 9, side: 52 },
+  { maxPlayers: Infinity, side: 58 },
+];
+
+export function mapSideFor(players: number): number {
+  return MAP_SIDES.find((s) => players <= s.maxPlayers)!.side;
+}
+
+/** Crates and traps grow with the floor: ×1 up to the smallest side, then by area (0 = as drawn = ×1). */
+export function areaScale(side: number): number {
+  const base = MAP_SIDES[0].side;
+  return side > base ? (side * side) / (base * base) : 1;
+}
+
+/** Floor-like tiles a stretch seam may cross (they just get bigger). */
+const SEAM_FREE = new Set(['.', '~', ':', '=']);
+
+/** Rows that may be repeated: every other tile continues straight through, so objects get longer, never wider. */
+function seamRows(rows: readonly string[]): number[] {
+  const out: number[] = [];
+  for (let y = 1; y < rows.length - 1; y++) {
+    let ok = true;
+    for (let x = 0; ok && x < rows[y].length; x++) {
+      const c = rows[y][x];
+      if (!SEAM_FREE.has(c) && (rows[y - 1][x] !== c || rows[y + 1][x] !== c)) ok = false;
+    }
+    if (ok) out.push(y);
+  }
+  return out;
+}
+
+/** Repeats seam rows (spread over the seams) until there are `target` rows. */
+function stretchRows(rows: readonly string[], target: number): string[] {
+  const extra = target - rows.length;
+  const seams = seamRows(rows);
+  if (extra <= 0 || !seams.length) return [...rows];
+  const times = new Map<number, number>();
+  for (let i = 0; i < extra; i++) {
+    const y = seams[Math.floor(((i + 0.5) * seams.length) / extra)];
+    times.set(y, (times.get(y) ?? 0) + 1);
+  }
+  return rows.flatMap((r, y) => Array<string>(1 + (times.get(y) ?? 0)).fill(r));
+}
+
+const transpose = (rows: readonly string[]) => [...rows[0]].map((_, x) => rows.map((r) => r[x]).join(''));
+
+/** The map's ASCII stretched to at least `side` × `side` tiles (0 = as drawn). */
+export function stretchAscii(ascii: readonly string[], side: number): string[] {
+  return transpose(stretchRows(transpose(stretchRows(ascii, side)), side));
+}
+
 const cache = new Map<string, MapData>();
 
-export function loadMap(id: string): MapData {
+export function loadMap(id: string, side = 0): MapData {
   const def = getMapDef(id);
-  const hit = cache.get(def.id);
+  const cacheKey = `${def.id}:${side}`;
+  const hit = cache.get(cacheKey);
   if (hit) return hit;
-  const height = def.ascii.length;
-  const width = def.ascii[0].length;
+  const ascii = stretchAscii(def.ascii, side);
+  const height = ascii.length;
+  const width = ascii[0].length;
   const tiles: string[] = [];
   const crateCandidates: Vec2[] = [];
   const variableCandidates: Vec2[] = [];
@@ -253,7 +309,7 @@ export function loadMap(id: string): MapData {
   let bx = 0, by = 0, bn = 0;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
-      const c = def.ascii[y][x];
+      const c = ascii[y][x];
       tiles.push(c);
       if (c === 'S') hiderSpawn = { x: x + 0.5, y: y + 0.5 };
       if (c === 'P') seekerSpawn = { x: x + 0.5, y: y + 0.5 };
@@ -274,7 +330,7 @@ export function loadMap(id: string): MapData {
     variableCandidates,
     ghostBounds: { x0: 1 - GHOST_BORDER, y0: 1 - GHOST_BORDER, x1: width - 1 + GHOST_BORDER, y1: height - 1 + GHOST_BORDER },
   };
-  cache.set(def.id, data);
+  cache.set(cacheKey, data);
   return data;
 }
 
@@ -292,9 +348,9 @@ export interface Layout {
   covers: { x: number; y: number; kind: VariableKind }[];
 }
 
-/** Deterministic layout: same (map, seed, stations) gives the same result everywhere. */
-export function buildLayout(mapId: string, seed: number, stations: number): Layout {
-  const map = loadMap(mapId);
+/** Deterministic layout: same (map, seed, stations, side) gives the same result everywhere. */
+export function buildLayout(mapId: string, seed: number, stations: number, side = 0): Layout {
+  const map = loadMap(mapId, side);
   const rng = new Rng(seed);
   const solid = new Uint8Array(map.width * map.height);
   const low = new Uint8Array(map.width * map.height);
@@ -302,7 +358,8 @@ export function buildLayout(mapId: string, seed: number, stations: number): Layo
     if (STATIC_SOLID.has(map.tiles[i])) solid[i] = 1;
     if (STATIC_LOW.has(map.tiles[i])) low[i] = 1;
   }
-  const crates = rng.shuffle([...map.crateCandidates]).slice(0, Math.max(0, Math.min(stations, map.crateCandidates.length)));
+  const wanted = Math.round(stations * areaScale(side));
+  const crates = rng.shuffle([...map.crateCandidates]).slice(0, Math.max(0, Math.min(wanted, map.crateCandidates.length)));
   for (const c of crates) solid[c.y * map.width + c.x] = low[c.y * map.width + c.x] = 1;
   const kinds: VariableKind[] = ['cube', 'bowl', 'spool'];
   const covers: Layout['covers'] = [];

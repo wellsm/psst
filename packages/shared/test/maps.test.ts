@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAPS, buildLayout, findPath, isSolid, loadMap } from '../src/maps';
+import { MAPS, MAP_SIDES, areaScale, buildLayout, findPath, isSolid, loadMap, mapSideFor } from '../src/maps';
 
 describe.each(MAPS.map((m) => m.id))('map %s', (id) => {
   const map = loadMap(id);
@@ -64,5 +64,42 @@ describe.each(MAPS.map((m) => m.id))('map %s', (id) => {
 
   it('spawns are connected by a path', () => {
     expect(findPath(full, map.hiderSpawn, map.seekerSpawn).length).toBeGreaterThan(10);
+  });
+});
+
+describe('map size by player count', () => {
+  it('46 m up to 6 players, 52 m up to 9, then 58 m', () => {
+    expect([1, 3, 6, 7, 9, 10, 12].map(mapSideFor)).toEqual([46, 46, 46, 52, 52, 58, 58]);
+    expect([0, 46, 52, 58].map((s) => Math.round(areaScale(s) * 100) / 100)).toEqual([1, 1, 1.28, 1.59]);
+  });
+
+  describe.each(MAPS.map((m) => m.id))('%s stretched', (id) => {
+    const count = (tiles: readonly string[], c: string) => tiles.join('').split(c).length - 1;
+    it.each(MAP_SIDES.map((s) => s.side))('to %i m: exact size, same markers and objects, all floor connected', (side) => {
+      const map = loadMap(id, side);
+      expect([map.width, map.height]).toEqual([side, side]);
+      // Single-tile markers and small objects are never repeated (only long walls/counters get longer).
+      for (const c of ['S', 'P', 'C', '?', 'O']) expect(count(map.tiles, c)).toBe(count(loadMap(id).tiles, c));
+      const full = buildLayout(id, 1, 10, side);
+      for (const v of map.variableCandidates) full.solid[v.y * map.width + v.x] = 1;
+      const walk: string[] = [];
+      for (let y = 0; y < map.height; y++) for (let x = 0; x < map.width; x++) if (!isSolid(full, x, y)) walk.push(`${x},${y}`);
+      const seen = new Set([walk[0]]);
+      const q = [walk[0]];
+      while (q.length) {
+        const [x, y] = q.shift()!.split(',').map(Number);
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const k = `${x + dx},${y + dy}`;
+          if (!isSolid(full, x + dx, y + dy) && !seen.has(k)) { seen.add(k); q.push(k); }
+        }
+      }
+      expect(seen.size).toBe(walk.length);
+    });
+  });
+
+  it('never shrinks a map; crates grow with the area', () => {
+    expect(loadMap('kitchen', 46).tiles).toEqual(loadMap('kitchen').tiles);
+    expect(buildLayout('kitchen', 1, 3, 58).crates.length).toBe(5);
+    expect(buildLayout('kitchen', 1, 3, 46).crates.length).toBe(3);
   });
 });

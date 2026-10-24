@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { Match } from '../src/sim/Match';
-import { DT, LANE_Y, audioOnly, effects, hold, input, p, place, run, setup, skipCountdown, sounds, trapAt, usePower } from './helpers';
+import { DT, LANE_Y, audioOnly, effects, hold, input, p, place, run, setup, skipCountdown, sounds, tileOf, trapAt, usePower } from './helpers';
 
 describe('lobby and flow', () => {
   it('only the host can start, and only with everyone ready and enough players', () => {
@@ -392,15 +392,16 @@ describe('phase 2: power-ups', () => {
   });
 
   it('super-jump: jumps clear low solids (mugs) but not walls', () => {
+    const mug = tileOf(setup(), 'O'); // 2×2 mug, free floor on both sides
     const walk = (power: boolean) => {
       const m = setup();
-      place(m, 'h1', 4.5, 6.5); // arena mug at x 6..8, y 6..8
+      place(m, 'h1', mug.x - 1.5, mug.y + 0.5);
       if (power) usePower(m, 'h1', 'jump');
-      hold(m, 'h1', { mx: 1, jump: true, ax: 40, ay: 6.5 }, 2);
+      hold(m, 'h1', { mx: 1, jump: true, ax: 60, ay: mug.y + 0.5 }, 2);
       return p(m, 'h1').move.x;
     };
-    expect(walk(false)).toBeLessThan(6);
-    expect(walk(true)).toBeGreaterThan(8.5);
+    expect(walk(false)).toBeLessThan(mug.x);
+    expect(walk(true)).toBeGreaterThan(mug.x + 2.5);
     const m = setup();
     place(m, 'h1', 3, LANE_Y);
     usePower(m, 'h1', 'jump');
@@ -580,5 +581,28 @@ describe('jump', () => {
     expect(seen().z).toBeGreaterThan(0.4);
     run(m, 0.4);
     expect(seen().z).toBeUndefined();
+  });
+});
+
+describe('map size by player count', () => {
+  it('stretches the map at start for the room size, sends it in the snapshot and resets in the lobby', () => {
+    for (const [bots, side] of [[0, 46], [5, 52], [8, 58]] as const) {
+      const m = setup({ bots });
+      expect([m.layout.map.width, m.layout.map.height]).toEqual([side, side]);
+      expect(m.buildSnapshot('h0')!.mapSide).toBe(side);
+    }
+    const m = setup();
+    m.phase = 'end';
+    m.phaseLeft = 1e-6;
+    m.step(DT);
+    expect(m.phase).toBe('lobby');
+    expect(m.mapSide).toBe(0);
+    expect(m.layout.map.width).toBe(38);
+  });
+
+  it('places more traps on a bigger map (counts scale with the area)', () => {
+    const ducks = (bots: number) => setup({ bots, settings: { duckCount: 4 } }).traps.filter((t) => t.k === 'duck').length;
+    expect(ducks(0)).toBe(4);
+    expect(ducks(8)).toBe(6);
   });
 });

@@ -11,6 +11,7 @@ import {
   defaultSettings,
   dist,
   normalizeRoomCode,
+  mapSideFor,
   seekerCountFor,
   voiceVolume,
   PLAYER_COLORS,
@@ -33,11 +34,22 @@ import { clear, h, hex } from './ui/dom';
 import { Hud } from './ui/Hud';
 import { computeHud } from './ui/hudModel';
 import { LOGO_SVG, LOGO_SVG_PT } from './ui/logo';
-import { drawMapPreview } from './ui/mapPreview';
+import { mapFacts, mapShot } from './ui/mapShot';
 import { MicTest, Voice } from './voice/Voice';
 
 type Screen = 'home' | 'play' | 'lobby' | 'game' | 'quit';
 type Overlay = 'settings' | 'pause' | null;
+
+// Desktop installers built by .github/workflows/desktop-release.yml; "latest" always points at the newest release.
+const DOWNLOAD_URL = 'https://github.com/wellsm/psst/releases/latest/download/';
+const DOWNLOADS = { mac: 'Psst-mac.dmg', win: 'Psst-win.exe', linux: 'Psst-linux.AppImage' } as const;
+type DesktopOs = keyof typeof DOWNLOADS;
+const OS_NAMES: Record<DesktopOs, string> = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
+
+function detectDesktopOs(): DesktopOs | null {
+  const ua = navigator.userAgent;
+  return /Windows/.test(ua) ? 'win' : /Macintosh/.test(ua) ? 'mac' : /Linux/.test(ua) ? 'linux' : null;
+}
 
 export class App {
   private ui = document.getElementById('ui')!;
@@ -96,6 +108,10 @@ export class App {
     addEventListener('keydown', () => this.audio.unlock(), { once: false });
     requestAnimationFrame(this.tick);
     this.render();
+    // A reload inside a room returns to the seat the server kept; otherwise the code waits on the Play screen.
+    if (new URLSearchParams(location.search).has('room')) {
+      void this.net.reconnect(this.handlers()).then((e) => e && this.go('play'));
+    }
   }
 
   // ------------------------------------------------------------------ frame loop (non-game screens)
@@ -211,6 +227,21 @@ export class App {
         this.btn(t('menu.play'), () => this.go('play'), 'big primary'),
         this.btn(t('menu.settings'), () => this.openOverlay('settings'), 'big'),
         this.btn(t('menu.quit'), () => this.go('quit'), 'big'),
+      ),
+      this.downloads(),
+    );
+  }
+
+  /** Desktop app download: main button for the visitor's OS, links for the others. Not shown in the app or on phones. */
+  private downloads() {
+    if (navigator.userAgent.includes('Electron') || isTouchDevice()) return null;
+    const os = detectDesktopOs();
+    const others = (Object.keys(DOWNLOADS) as DesktopOs[]).filter((o) => o !== os);
+    return h('div.downloads', null,
+      os && this.btn(t('menu.download', { os: OS_NAMES[os] }), () => { location.href = DOWNLOAD_URL + DOWNLOADS[os]; }),
+      h('div.row', null,
+        os ? t('menu.downloadOther') : t('menu.downloadApp'),
+        others.map((o) => h('a', { href: DOWNLOAD_URL + DOWNLOADS[o] }, OS_NAMES[o])),
       ),
     );
   }
@@ -502,22 +533,29 @@ export class App {
 
     // Map selector.
     clear(els.mapBox);
-    // Every map visible as a same-size tile; the info block has a reserved height so picking never moves the layout.
-    const grid = h('div.map-grid');
-    for (const m of MAPS) {
-      const canvas = h('canvas');
-      drawMapPreview(canvas, m.id, l.settings.bottleRefillStations);
-      grid.append(h(`button.map-tile${m.id === l.mapId ? '.on' : ''}`, {
-        disabled: !host,
-        title: host ? undefined : t('lobby.hostOnly'),
-        onclick: () => this.net.send('setMap', { mapId: m.id }),
-      }, canvas, h('span', null, t(`map.${m.id}.name`))));
-    }
+    // One map at a time; the host flips through them with the arrows (wrapping). Reserved heights keep the layout still.
+    const idx = Math.max(0, MAPS.findIndex((m) => m.id === l.mapId));
+    const step = (d: number) => this.net.send('setMap', { mapId: MAPS[(idx + d + MAPS.length) % MAPS.length].id });
+    const arrow = (d: number, label: string, glyph: string) => h('button.map-arrow', {
+      'aria-label': label, disabled: !host, title: host ? label : t('lobby.hostOnly'), onclick: () => step(d),
+    }, glyph);
+    // Preview at the size the match will have with the current room (it grows with the player count).
+    const side = mapSideFor(l.players.length);
+    const facts = mapFacts(l.mapId, l.settings, side);
     els.mapBox.append(
-      grid,
+      h('div.map-carousel', null, arrow(-1, t('lobby.prevMap'), '◀'), mapShot(l.mapId, l.settings, side), arrow(1, t('lobby.nextMap'), '▶')),
       h('div.map-info', null,
-        h('h3', { style: { color: '#ffd23f' } }, t(`map.${l.mapId}.name`)),
+        h('div.row.map-title', null,
+          h('h3', { style: { color: '#ffd23f' } }, t(`map.${l.mapId}.name`)),
+          h('span.map-count', null, `${idx + 1} / ${MAPS.length}`),
+        ),
         h('div.hint', null, t(`map.${l.mapId}.desc`)),
+        h('div.map-facts', null,
+          h('span.chip', { title: t('lobby.mapGrows') }, `📐 ${t('lobby.mapSize', { w: facts.width, h: facts.height })}`),
+          h('span.chip', null, `📦 ${t('lobby.mapCrates', { n: facts.crates })}`),
+          h('span.chip', null, `💧 ${t('lobby.mapNoisy', { n: facts.noisy })}`),
+          h('span.chip', null, `🦆 ${t('lobby.mapTraps', { n: facts.traps })}`),
+        ),
       ),
     );
 

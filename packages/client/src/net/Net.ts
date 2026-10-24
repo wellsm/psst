@@ -58,9 +58,23 @@ export class Net {
     }
   }
 
+  /** Rejoin the seat kept by the server after a reload (same tab). */
+  async reconnect(h: NetHandlers): Promise<JoinError | null> {
+    const token = storage(() => sessionStorage.getItem(TOKEN_KEY));
+    if (!token) return 'noRoom';
+    try {
+      this.attach(await this.client.reconnect(token), h);
+      return null;
+    } catch (e) {
+      storage(() => sessionStorage.removeItem(TOKEN_KEY));
+      return mapError(e);
+    }
+  }
+
   private attach(room: Room, h: NetHandlers) {
     this.room = room;
     this.intentionalLeave = false;
+    storage(() => sessionStorage.setItem(TOKEN_KEY, room.reconnectionToken));
     room.onMessage('welcome', (m: { id: string; code: string }) => h.onWelcome(m.id, m.code));
     room.onMessage('lobby', (m: LobbyState) => h.onLobby(m));
     room.onMessage('snap', (m: Snapshot) => h.onSnap(m));
@@ -91,7 +105,15 @@ export class Net {
     this.intentionalLeave = true;
     this.room?.leave();
     this.room = null;
+    storage(() => sessionStorage.removeItem(TOKEN_KEY));
   }
+}
+
+const TOKEN_KEY = 'psst.reconnect';
+
+// sessionStorage may throw (blocked site data): reconnect is a convenience, never fail on it.
+function storage<T>(fn: () => T): T | null {
+  try { return fn(); } catch { return null; }
 }
 
 function mapError(e: unknown): JoinError {

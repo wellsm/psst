@@ -172,6 +172,8 @@ export interface Snapshot {
   beaconLeft: number;
   seed: number;
   mapId: MapId;
+  /** Map side the layout was stretched to (0 = as drawn). */
+  mapSide: number;
   me: MeState | null;
   players: SnapPlayer[];
   /** Bottles held by hiders that are otherwise hidden from this viewer. */

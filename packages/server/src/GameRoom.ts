@@ -8,6 +8,7 @@ import {
 import { Match } from './sim/Match';
 import { createVoiceToken, voiceConfigured } from './voice';
 
+const RECONNECT_SECONDS = 30;
 const usedCodes = new Set<string>();
 
 function uniqueCode(): string {
@@ -67,7 +68,18 @@ export class GameRoom extends Room {
     client.send('welcome', { id: client.sessionId, code: this.roomId });
   }
 
-  override onLeave(client: Client) {
+  override async onLeave(client: Client, consented: boolean) {
+    // Dropped connections (page reload, network blip) keep their seat for a while.
+    if (!consented) {
+      try {
+        const back = await this.allowReconnection(client, RECONNECT_SECONDS);
+        back.send('welcome', { id: back.sessionId, code: this.roomId });
+        this.match.lobbyDirty = true;
+        return;
+      } catch {
+        // Timed out: free the seat below.
+      }
+    }
     this.match.removePlayer(client.sessionId);
   }
 

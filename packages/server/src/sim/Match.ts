@@ -11,6 +11,7 @@ import {
   Rng,
   SOUND_DEFS,
   applySettings,
+  areaScale,
   audioGain,
   forwardYaw,
   listenerPan,
@@ -24,6 +25,7 @@ import {
   isVisibleTo,
   jumpHeight,
   layoutTraps,
+  mapSideFor,
   newMoveState,
   powerDuration,
   proximityMultiplier,
@@ -180,6 +182,8 @@ export class Match {
   beaconLeft = 0;
   time = 0;
   seed = 0;
+  /** Map side for this match (`mapSideFor` the player count at start); 0 in the lobby = as drawn. */
+  mapSide = 0;
   layout: Layout;
   hostId = '';
   voiceAvailable = false;
@@ -335,7 +339,8 @@ export class Match {
     const s = this.settings;
     this.seed = Math.floor(this.random() * 2 ** 31);
     this.rng = new Rng(this.seed ^ 0x5eed);
-    this.layout = buildLayout(this.mapId, this.seed, s.bottleRefillStations);
+    this.mapSide = mapSideFor(this.players.size);
+    this.layout = buildLayout(this.mapId, this.seed, s.bottleRefillStations, this.mapSide);
     this.walkable = [];
     const m = this.layout.map;
     for (let y = 1; y < m.height - 1; y++) for (let x = 1; x < m.width - 1; x++) if (!isSolid(this.layout, x, y)) this.walkable.push({ x: x + 0.5, y: y + 0.5 });
@@ -409,6 +414,7 @@ export class Match {
     this.result = null;
     this.phase = 'lobby';
     this.phaseLeft = 0;
+    this.mapSide = 0;
     this.layout = buildLayout(this.mapId, 0, this.settings.bottleRefillStations);
     this.lobbyDirty = true;
   }
@@ -880,7 +886,9 @@ export class Match {
   // ------------------------------------------------------------------ traps & map events
 
   private addTraps(counts: Partial<Record<TrapKind, number>>, extra: boolean) {
-    const spots = layoutTraps(this.layout, this.seed + this.trapSeq, this.settings, counts, this.traps);
+    const scale = areaScale(this.mapSide);
+    const scaled = Object.fromEntries(Object.entries(counts).map(([k, n]) => [k, Math.round(n * scale)]));
+    const spots = layoutTraps(this.layout, this.seed + this.trapSeq, this.settings, scaled, this.traps);
     for (const t of spots) this.traps.push({ id: this.trapSeq++, k: t.k, x: t.x, y: t.y, armed: true, rearmIn: 0, ringsLeft: 0, ringIn: 0, extra });
   }
 
@@ -1081,6 +1089,7 @@ export class Match {
       beaconLeft: Math.max(0, this.beaconLeft),
       seed: this.seed,
       mapId: this.mapId,
+      mapSide: this.mapSide,
       me: this.meState(me),
       players: [],
       held: [],

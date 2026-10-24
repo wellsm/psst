@@ -126,4 +126,20 @@ describe('end-to-end', () => {
     await until(() => guest.lobby!.hostId === guest.id);
     await guest.room.leave();
   }, 70_000);
+
+  it('a dropped connection (page reload) gets its seat back with the reconnection token', async () => {
+    const url = `ws://localhost:${PORT}`;
+    const host = wire(await new Client(url).create('game', { name: 'Host' }));
+    await until(() => !!host.lobby);
+    const token = host.room.reconnectionToken;
+
+    await host.room.leave(false);
+    await wait(100);
+    const back = wire(await new Client(url).reconnect(token));
+    expect(back.id).toBe(host.id);
+    await until(() => !!back.lobby);
+    expect(back.lobby!.hostId).toBe(host.id);
+    expect(back.lobby!.players).toHaveLength(1);
+    await back.room.leave();
+  });
 });
