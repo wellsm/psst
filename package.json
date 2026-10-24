@@ -1,0 +1,29 @@
+{
+  "name": "psst",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @psst/server & npm run dev -w @psst/client",
+    "dev:server": "npm run dev -w @psst/server",
+    "dev:client": "npm run dev -w @psst/client",
+    "build": "npm run build -w @psst/client",
+    "desktop": "npm run dev -w @psst/desktop",
+    "dist:desktop": "node -e \"if(!process.env.VITE_SERVER_URL){console.error('Set VITE_SERVER_URL, e.g. VITE_SERVER_URL=wss://your-server npm run dist:desktop');process.exit(1)}\" && npm run build && npm run dist -w @psst/desktop --",
+    "start": "npm run start -w @psst/server",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@types/node": "^24.19.2",
+    "eslint": "^9.39.5",
+    "globals": "^17.13.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.0",
+    "vitest": "^3.2.7"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "@psst/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@colyseus/ws-transport": "^0.16.5",
+    "@psst/shared": "*",
+    "colyseus": "^0.16.5",
+    "livekit-server-sdk": "^2.19.1",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "colyseus.js": "^0.16.22"
+  }
+}

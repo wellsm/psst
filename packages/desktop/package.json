@@ -1,0 +1,59 @@
+{
+  "name": "@psst/desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Psst! desktop app",
+  "author": "Psst",
+  "main": "main.cjs",
+  "scripts": {
+    "dev": "PSST_DEV_URL=http://localhost:5173 electron .",
+    "start": "electron .",
+    "dist": "electron-builder",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "game.psst.desktop",
+    "productName": "Psst",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.cjs"
+    ],
+    "extraResources": [
+      {
+        "from": "../client/dist",
+        "to": "web"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.games",
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Proximity voice chat with the other players."
+      }
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Game"
+    }
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "electron-builder": "26.17.0"
+  }
+}
