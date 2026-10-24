@@ -40,8 +40,10 @@ import { MicTest, Voice } from './voice/Voice';
 type Screen = 'home' | 'play' | 'lobby' | 'game' | 'quit';
 type Overlay = 'settings' | 'pause' | null;
 
-// Desktop installers built by .github/workflows/desktop-release.yml; "latest" always points at the newest release.
-const DOWNLOAD_URL = 'https://github.com/wellsm/psst/releases/latest/download/';
+// Desktop installers built by .github/workflows/desktop-release.yml, e.g.
+// VITE_DOWNLOAD_URL=https://github.com/wellsm/psst/releases/latest/download/ ("latest" = newest release).
+// Unset at build time: no download links (no release published yet).
+const DOWNLOAD_URL = import.meta.env.VITE_DOWNLOAD_URL ?? '';
 const DOWNLOADS = { mac: 'Psst-mac.dmg', win: 'Psst-win.exe', linux: 'Psst-linux.AppImage' } as const;
 type DesktopOs = keyof typeof DOWNLOADS;
 const OS_NAMES: Record<DesktopOs, string> = { mac: 'macOS', win: 'Windows', linux: 'Linux' };
@@ -234,7 +236,7 @@ export class App {
 
   /** Desktop app download: main button for the visitor's OS, links for the others. Not shown in the app or on phones. */
   private downloads() {
-    if (navigator.userAgent.includes('Electron') || isTouchDevice()) return null;
+    if (!DOWNLOAD_URL || navigator.userAgent.includes('Electron') || isTouchDevice()) return null;
     const os = detectDesktopOs();
     const others = (Object.keys(DOWNLOADS) as DesktopOs[]).filter((o) => o !== os);
     return h('div.downloads', null,

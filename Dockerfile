@@ -1,6 +1,7 @@
 # Single container: the Node game server (Colyseus over WebSocket) also serves the built client.
 # Build: docker build -t psst .
 # Run:   docker run --rm -p 2567:2567 psst            (voice: add -e LIVEKIT_URL -e LIVEKIT_API_KEY -e LIVEKIT_API_SECRET)
+# Desktop download links on the home screen: --build-arg VITE_DOWNLOAD_URL=https://github.com/<owner>/<repo>/releases/latest/download/
 
 FROM node:24-slim AS build
 WORKDIR /app
@@ -13,6 +14,8 @@ RUN npm ci -w @psst/shared -w @psst/server -w @psst/client --include-workspace-r
 COPY tsconfig.base.json ./
 COPY packages/shared packages/shared
 COPY packages/client packages/client
+# Build args are visible to RUN as env vars (Vite reads VITE_*); empty = no download links.
+ARG VITE_DOWNLOAD_URL=
 RUN npm run build
 
 FROM node:24-slim

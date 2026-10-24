@@ -79,8 +79,9 @@ Targets: macOS dmg/zip, Windows nsis/zip (`npm run dist:win -w @psst/desktop`), 
 
 Releases: pushing a `v*` tag (`git tag v0.2.0 && git push origin v0.2.0`) runs `.github/workflows/desktop-release.yml`,
 which builds each OS on its own runner and publishes a GitHub Release (needs the repository variable `VITE_SERVER_URL`).
-The home screen links to `releases/latest/download/Psst-{mac.dmg,win.exe,linux.AppImage}` (button for the visitor's OS),
-so keep the `artifactName` patterns in `packages/desktop/package.json`.
+Download links on the home screen are off until the web build gets `VITE_DOWNLOAD_URL`
+(e.g. `https://github.com/wellsm/psst/releases/latest/download/`; Docker: `--build-arg VITE_DOWNLOAD_URL=...`).
+They point at `Psst-{mac.dmg,win.exe,linux.AppImage}`, so keep the `artifactName` patterns in `packages/desktop/package.json`.
 Steam Deck / Steam Input without publishing: add the app as a "Non-Steam game" in the Steam library.
 
 ## Docs
