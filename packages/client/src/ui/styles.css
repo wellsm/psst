@@ -137,6 +137,11 @@ h3 { font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spa
 /* Settings */
 .tabs { display: flex; gap: 8px; }
 .settings-body { width: min(720px, 100%); max-height: 64vh; overflow: auto; }
+.help { display: flex; flex-direction: column; gap: 8px; line-height: 1.45; }
+.help p { margin: 0; }
+.help h2 { margin-top: 6px; font-size: 19px; color: var(--yellow); }
+.help-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.help-keys .keycap { min-width: 0; }
 .setting-row { display: grid; grid-template-columns: 1fr 1.2fr; gap: 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid #0c0c1c88; }
 .setting-row input[type=range] { width: 100%; accent-color: var(--aqua); }
 .select { background: var(--bg2); border: 3px solid var(--line); border-radius: 10px; padding: 6px 8px; font-weight: 700; }

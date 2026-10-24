@@ -38,7 +38,7 @@ import { mapFacts, mapShot } from './ui/mapShot';
 import { MicTest, Voice } from './voice/Voice';
 
 type Screen = 'home' | 'play' | 'lobby' | 'game' | 'quit';
-type Overlay = 'settings' | 'pause' | null;
+type Overlay = 'settings' | 'help' | 'pause' | null;
 
 // Desktop installers built by .github/workflows/desktop-release.yml, e.g.
 // VITE_DOWNLOAD_URL=https://github.com/wellsm/psst/releases/latest/download/ ("latest" = newest release).
@@ -150,6 +150,7 @@ export class App {
       case 'quit': this.ui.append(this.quitScreen()); break;
     }
     if (this.overlay === 'settings') this.ui.append(this.settingsScreen());
+    if (this.overlay === 'help') this.ui.append(this.helpScreen());
     if (this.overlay === 'pause') this.ui.append(this.pauseScreen());
     // Shown by CSS only on touch screens held in portrait.
     this.ui.append(h('div.rotate', null, h('div.rotate-phone'), h('p', null, t('touch.rotate'))));
@@ -185,7 +186,7 @@ export class App {
   }
 
   private onPauseKey() {
-    if (this.overlay === 'settings') this.openOverlay(this.screen === 'game' ? 'pause' : null);
+    if (this.overlay === 'settings' || this.overlay === 'help') this.openOverlay(this.screen === 'game' ? 'pause' : null);
     else if (this.overlay === 'pause') this.resume();
     else if (this.screen === 'game') this.openOverlay('pause');
   }
@@ -227,6 +228,7 @@ export class App {
       h('p.tagline', null, t('game.tagline')),
       h('div.stack', null,
         this.btn(t('menu.play'), () => this.go('play'), 'big primary'),
+        this.btn(t('menu.help'), () => this.openOverlay('help'), 'big'),
         this.btn(t('menu.settings'), () => this.openOverlay('settings'), 'big'),
         this.btn(t('menu.quit'), () => this.go('quit'), 'big'),
       ),
@@ -338,7 +340,7 @@ export class App {
       this.go('game');
     } else if (!inGame && this.screen !== 'lobby') {
       this.input.unlock();
-      this.overlay = this.overlay === 'settings' ? 'settings' : null;
+      this.overlay = this.overlay === 'settings' || this.overlay === 'help' ? this.overlay : null;
       this.go('lobby');
     } else if (this.screen === 'lobby') {
       this.updateLobby();
@@ -493,6 +495,7 @@ export class App {
         h('div.row', null, h('h3', null, t('lobby.code')), h('div.code-box', null, this.world.code), codeBtn),
         h('div.row', null,
           prefs.voiceMode === 'ptt' ? ptt : null,
+          this.btn(t('menu.help'), () => this.openOverlay('help'), 'small'),
           this.btn(t('menu.settings'), () => this.openOverlay('settings'), 'small'),
           this.btn(t('lobby.leave'), () => this.leaveRoom(), 'small danger'),
         ),
@@ -671,6 +674,7 @@ export class App {
       h('div.card.stack', { style: { width: 'min(420px, 100%)' } },
         this.btn(t('pause.resume'), () => this.resume(), 'big primary'),
         h('div.setting-row', null, h('span', null, t('pause.sensitivity')), h('div.row', null, sens, sensVal)),
+        this.btn(t('menu.help'), () => this.openOverlay('help'), 'big'),
         this.btn(t('pause.settings'), () => this.openOverlay('settings'), 'big'),
         this.btn(t('pause.leave'), () => this.leaveRoom(), 'big danger'),
       ),
@@ -690,6 +694,33 @@ export class App {
       body,
       this.btn(t('settings.back'), back),
     );
+  }
+
+  /** What the game is and how to play each role; controls follow the device in use. */
+  private helpScreen() {
+    const list = (key: string, n: number) => h('ul.help-list', null, Array.from({ length: n }, (_, i) => h('li', null, t(`${key}.${i + 1}`))));
+    const back = () => this.openOverlay(this.screen === 'game' ? 'pause' : null);
+    return h('div.screen.overlay', null,
+      h('h1', null, t('help.title')),
+      h('div.card.settings-body.help', null,
+        h('p', null, t('help.what')),
+        h('h2', null, t('help.hider')), list('help.hider', 5),
+        h('h2', null, t('help.seeker')), list('help.seeker', 4),
+        h('h2', null, t('help.extras')), list('help.extras', 4),
+        h('h2', null, t('help.controls')), this.helpControls(),
+      ),
+      this.btn(t('settings.back'), back),
+    );
+  }
+
+  private helpControls() {
+    const device = inputDevice();
+    const moveKeys = (['moveUp', 'moveLeft', 'moveDown', 'moveRight'] as const).map((a) => codeLabel(prefs.binds[a], t)).join(' ');
+    const rows: [string, string][] = device === 'keyboard'
+      ? [[t('help.move'), moveKeys], [t('help.look'), t('help.lookMouse')]]
+      : [[t('help.move'), t(`help.move.${device}`)]];
+    for (const a of ACTIONS) if (!a.startsWith('move')) rows.push([t(`action.${a}`), actionLabel(a)]);
+    return h('div.help-keys', null, rows.map(([label, key]) => this.row(label, h('span.keycap', null, key))));
   }
 
   private row(label: string, ...control: (Node | string | null)[]) {
